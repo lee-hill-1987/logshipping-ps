@@ -31,3 +31,13 @@ SQL_PerformBackup -serverName $destinationServer -instanceName $fullSourceInstan
 "\\$fullDestinationInstanceName\backup\$dbName.bak"
 
 SQL_RestoreDatabase -sourceInstance $fullSourceInstanceName -targetInstance $fullDestinationInstanceName -dbName $dbName -backupFilePath "\\$fullDestinationInstanceName\backup\$dbName.bak"
+
+$BackupJobName = "LSBackup_$($fullSourceInstanceName.Replace("\","-"))_$($dbName)"
+$CopyJobName = "LSCopy_$($fullDestinationInstanceName.Replace("\","-"))_$($dbName)"
+$RestoreJobName = "LSRestore_$($fullDestinationInstanceName.Replace("\","-"))_$($dbName)"
+
+SQL_WriteOutSQLFiles -sourceServer $fullSourceInstanceName -targetServer $fullDestinationInstanceName -dbName $dbName -BackupJobName $BackupJobName -CopyJobName $CopyJobName -RestoreJobName $RestoreJobName
+
+Start_SQLAgentJob -SQLServer $fullSourceInstanceName -JobName $BackupJobName
+
+
