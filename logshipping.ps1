@@ -15,4 +15,5 @@ foreach($line in $csv)
     Start-Job -FilePath C:\scratch\logshipping_ps\AsyncProcess.ps1 -ArgumentList $Credentials, $line.SourceServer,$line.DestinationServer, $line.InstanceName, $line.DestInstanceName, $line.DatabaseName
 }
 
-Get-Job | % { Receive-Job $_.Id;}#Remove-Job -Force $_.Id;}
+Start-Sleep -Seconds 45
+Get-Job | % { Receive-Job $_.Id;}

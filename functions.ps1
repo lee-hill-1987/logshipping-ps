@@ -37,6 +37,13 @@ function SQL_RestoreDatabase{
     Invoke-Sqlcmd -ServerInstance $targetInstance -Query $query 
 }
 
+function SQL_RestoreWithRecovery{
+    param($targetInstance, [string] $dbName)
+
+     Write-host "setting recovery on $targetInstance.$dbName"    
+        Invoke-Sqlcmd -Query "restore database $dbName with RECOVERY;" -ServerInstance $targetInstance
+}
+
 function SQL_WriteOutSQLFiles{
 param ([string] $sourceServer,  [string] $targetServer, [string] $dbName, $BackupJobName, $CopyJobName, $RestoreJobName)
 $source = "$($sourceServer.Replace("\","-"))_$($dbName)"
@@ -56,7 +63,7 @@ EXEC @SP_Add_RetCode = master.dbo.sp_add_log_shipping_primary_database
 		,@backup_job_name = N'LSBackup_$source' 
 		,@backup_retention_period = 4320
 		,@backup_threshold = 60 
-		,@threshold_alert_enabled = 1
+		,@threshold_alert_enabled = 0
 		,@history_retention_period = 5760 
 		,@backup_job_id = @LS_BackupJobId OUTPUT 
 		,@primary_id = @LS_PrimaryId OUTPUT 
@@ -91,7 +98,7 @@ EXEC msdb.dbo.sp_attach_schedule
 
 EXEC msdb.dbo.sp_update_job 
 		@job_id = @LS_BackupJobId 
-		,@enabled = 1 
+		,@enabled = 0 
 
 END 
 
@@ -193,7 +200,7 @@ IF (@@ERROR = 0 AND @LS_Add_RetCode = 0)
 BEGIN 
 
 EXEC @LS_Add_RetCode2 = master.dbo.sp_add_log_shipping_secondary_database 
-		@secondary_database = N'test1' 
+		@secondary_database = N'$dbName' 
 		,@primary_server = N'$sourceServer' 
 		,@primary_database = N'$dbName' 
 		,@restore_delay = 0 
@@ -230,9 +237,22 @@ $text | Out-File -FilePath $secondaryfileName
 
 Invoke-Sqlcmd -ServerInstance $targetServer -InputFile $secondaryfileName
 
-
 }
 
+function SQL_DisableLogShippingPrimary{
+param($sourceServer, $targetServer, $dbName)
+$query = 
+"
+    EXEC master.dbo.sp_delete_log_shipping_primary_secondary  
+    @primary_database = N'$dbName'  
+    ,@secondary_server = N'$targetServer'  
+    ,@secondary_database = N'$dbName';  
+    GO  
+"
+
+Invoke-Sqlcmd -ServerInstance $sourceServer -Query $query
+
+}
 
 function RunBackupJob{
 
@@ -260,7 +280,7 @@ function Start_SQLAgentJob
     $JobObj.Refresh()
 
     # If the job is and enabled and not currently executing start it
-    if ($JobObj.IsEnabled -and $JobObj.CurrentRunStatus -ne "Executing") {
+    if ($JobObj.CurrentRunStatus -ne "Executing") {
         $JobObj.Start()
     }
 

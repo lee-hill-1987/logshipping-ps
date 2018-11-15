@@ -30,14 +30,41 @@ SQL_PerformBackup -serverName $destinationServer -instanceName $fullSourceInstan
 
 "\\$fullDestinationInstanceName\backup\$dbName.bak"
 
+Start-Sleep -Seconds 5
+
 SQL_RestoreDatabase -sourceInstance $fullSourceInstanceName -targetInstance $fullDestinationInstanceName -dbName $dbName -backupFilePath "\\$fullDestinationInstanceName\backup\$dbName.bak"
+
+Start-Sleep -Seconds 5
 
 $BackupJobName = "LSBackup_$($fullSourceInstanceName.Replace("\","-"))_$($dbName)"
 $CopyJobName = "LSCopy_$($fullDestinationInstanceName.Replace("\","-"))_$($dbName)"
 $RestoreJobName = "LSRestore_$($fullDestinationInstanceName.Replace("\","-"))_$($dbName)"
 
+$BackupJobName
+$CopyJobName
+$RestoreJobName
+
 SQL_WriteOutSQLFiles -sourceServer $fullSourceInstanceName -targetServer $fullDestinationInstanceName -dbName $dbName -BackupJobName $BackupJobName -CopyJobName $CopyJobName -RestoreJobName $RestoreJobName
 
+Start-Sleep -Seconds 5
+
 Start_SQLAgentJob -SQLServer $fullSourceInstanceName -JobName $BackupJobName
+
+Start-Sleep -Seconds 3
+
+Start_SQLAgentJob -SQLServer $fullDestinationInstanceName -JobName $CopyJobName
+
+Start-Sleep -Seconds 3
+
+Start_SQLAgentJob -SQLServer $fullDestinationInstanceName -JobName $RestoreJobName
+
+Start-Sleep -Seconds 3
+
+SQL_RestoreWithRecovery -targetInstance $fullDestinationInstanceName -dbName $dbName
+
+Start-Sleep -Seconds 3
+
+SQL_DisableLogShippingPrimary -sourceServer $fullSourceInstanceName -targetServer $fullDestinationInstanceName -dbName $dbName
+
 
 
