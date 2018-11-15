@@ -1,0 +1,4 @@
+﻿DatabaseName,SourceServer,InstanceName,DestinationServer,DestInstanceName
+test1,W10-130,DEV2005,WS2012-BI,
+test2,W10-130,DEV2005,WS2012-BI,
+test3,W10-130,DEV2005,WS2012-BI,
