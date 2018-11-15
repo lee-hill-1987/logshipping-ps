@@ -246,8 +246,7 @@ $query =
     EXEC master.dbo.sp_delete_log_shipping_primary_secondary  
     @primary_database = N'$dbName'  
     ,@secondary_server = N'$targetServer'  
-    ,@secondary_database = N'$dbName';  
-    GO  
+    ,@secondary_database = N'$dbName';
 "
 
 Invoke-Sqlcmd -ServerInstance $sourceServer -Query $query
