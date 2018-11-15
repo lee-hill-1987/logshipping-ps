@@ -16,8 +16,6 @@ function SQL_PerformBackup{
 
         Invoke-Sqlcmd -ServerInstance $instanceName -Query $query -QueryTimeout 1000
     }
-
-function SQL_remove
         
 function SQL_RestoreDatabase{
     param([string] $sourceInstance, [string] $targetInstance, [string] $dbName, [string] $backupFilePath)
