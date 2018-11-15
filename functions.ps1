@@ -45,7 +45,7 @@ function SQL_RestoreWithRecovery{
 }
 
 function SQL_WriteOutSQLFiles{
-param ([string] $sourceServer,  [string] $targetServer, [string] $dbName, $BackupJobName, $CopyJobName, $RestoreJobName)
+param ([string] $sourceServer,  [string] $targetServer, [string] $dbName, $BackupJobName, $CopyJobName, $RestoreJobName, $ScriptDirectory)
 $source = "$($sourceServer.Replace("\","-"))_$($dbName)"
 $target = "$($targetServer.Replace("\","-"))_$($dbName)"
 
@@ -108,7 +108,7 @@ EXEC master.dbo.sp_add_log_shipping_primary_secondary
 		,@secondary_database = N'$dbName' 
 		,@overwrite = 1 
 "
-$primaryfileName = "C:\scratch\logshipping_ps\$source.sql"
+$primaryfileName = "$ScriptDirectory\$source.sql"
 
 $primaryfileName
 $primarytext | Out-File -FilePath $primaryfileName
@@ -230,7 +230,7 @@ END
 
 "
 
-$secondaryfileName = "C:\scratch\logshipping_ps\$target.sql"
+$secondaryfileName = "$ScriptDirectory\$target.sql"
 
 $secondaryfileName
 $text | Out-File -FilePath $secondaryfileName

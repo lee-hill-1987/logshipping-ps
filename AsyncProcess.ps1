@@ -1,14 +1,24 @@
-﻿param( [System.Management.Automation.PSCredential]$LoginCredential, [string] $sourceServer, [string] $destinationServer, [string] $instanceName, [string] $destinationInstanceName, [string] $dbName )
+﻿param( [System.Management.Automation.PSCredential]$LoginCredential, [string] $sourceServer, [string] $destinationServer, [string] $instanceName, [string] $destinationInstanceName, [string] $dbName, [string] $ScriptDirectory )
+
+$ScriptDirectory
 
 # region include functions file
-
 try {
-    . ("C:\scratch\logshipping_ps\functions.ps1")
+    . ("$ScriptDirectory\functions.ps1")
 }
 catch {
     Write-Host "Error while loading supporting PowerShell Scripts" 
 }
 #endregion
+
+if($instanceName)
+{
+    $fullSourceInstanceName = "$sourceServer\$instanceName"
+}
+else
+{
+    $fullSourceInstanceName = "$sourceServer"
+}
 
 
 $fullSourceInstanceName = "$sourceServer\$instanceName"
@@ -44,7 +54,7 @@ $BackupJobName
 $CopyJobName
 $RestoreJobName
 
-SQL_WriteOutSQLFiles -sourceServer $fullSourceInstanceName -targetServer $fullDestinationInstanceName -dbName $dbName -BackupJobName $BackupJobName -CopyJobName $CopyJobName -RestoreJobName $RestoreJobName
+SQL_WriteOutSQLFiles -sourceServer $fullSourceInstanceName -targetServer $fullDestinationInstanceName -dbName $dbName -BackupJobName $BackupJobName -CopyJobName $CopyJobName -RestoreJobName $RestoreJobName -ScriptDirectory $ScriptDirectory
 
 Start-Sleep -Seconds 5
 
