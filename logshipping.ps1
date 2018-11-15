@@ -25,4 +25,9 @@ foreach($line in $csv)
 }
 
 Start-Sleep -Seconds 45
-Get-Job | % { Receive-Job $_.Id }
+
+$asyncscript
+
+Get-Job | % { Receive-Job $_.Id}
+
+

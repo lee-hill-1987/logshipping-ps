@@ -2,7 +2,7 @@
     param([string] $fullSourceInstanceName, [string] $dbName )
 
         Write-host "setting recovery on $fullSourceInstanceName.$dbName"    
-        Invoke-Sqlcmd -Query "ALTER database $dbName SET RECOVERY FULL;" -ServerInstance $fullSourceInstanceName
+        Invoke-Sqlcmd -Query "ALTER database $dbName SET RECOVERY FULL;" -ServerInstance $fullSourceInstanceName -QueryTimeout 1000
     }
 
 function SQL_PerformBackup{
@@ -14,14 +14,16 @@ function SQL_PerformBackup{
 
         $query = "backup database $dbName to disk = '\\$serverName\backup\$dbName.bak'"
 
-        Invoke-Sqlcmd -ServerInstance $instanceName -Query $query
+        Invoke-Sqlcmd -ServerInstance $instanceName -Query $query -QueryTimeout 1000
     }
         
 function SQL_RestoreDatabase{
     param([string] $sourceInstance, [string] $targetInstance, [string] $dbName, [string] $backupFilePath)
 
-    $datafiles = Invoke-Sqlcmd -ServerInstance $sourceInstance -Database $dbName -Query “select name, physical_name from sys.master_files where name like '%$dbName%' and type = 0”
-    $logfiles = Invoke-Sqlcmd -ServerInstance $sourceInstance -Database $dbName -Query “select name, physical_name from sys.master_files where name like '%$dbName%' and type = 1”
+    $datafiles = Invoke-Sqlcmd -ServerInstance $sourceInstance -Database $dbName -QueryTimeout 1000 -Query “select name, physical_name from master.sys.master_files where name like '%$dbName%' and type = 0”
+    $logfiles = Invoke-Sqlcmd -ServerInstance $sourceInstance -Database $dbName -QueryTimeout 1000 -Query “select name, physical_name from master.sys.master_files where name like '%$dbName%' and type = 1”
+
+    $datafiles
 
     $datafile = $datafiles.name
     $logfile = $logfiles.name
@@ -34,14 +36,14 @@ function SQL_RestoreDatabase{
     $targetInstance
     $query
 
-    Invoke-Sqlcmd -ServerInstance $targetInstance -Query $query 
+    Invoke-Sqlcmd -ServerInstance $targetInstance -Query $query -QueryTimeout 1000
 }
 
 function SQL_RestoreWithRecovery{
     param($targetInstance, [string] $dbName)
 
      Write-host "setting recovery on $targetInstance.$dbName"    
-        Invoke-Sqlcmd -Query "restore database $dbName with RECOVERY;" -ServerInstance $targetInstance
+        Invoke-Sqlcmd -Query "restore database $dbName with RECOVERY;" -ServerInstance $targetInstance -QueryTimeout 1000
 }
 
 function SQL_WriteOutSQLFiles{
@@ -113,7 +115,7 @@ $primaryfileName = "$ScriptDirectory\$source.sql"
 $primaryfileName
 $primarytext | Out-File -FilePath $primaryfileName
 
-Invoke-Sqlcmd -ServerInstance $sourceServer -InputFile $primaryfileName
+Invoke-Sqlcmd -ServerInstance $sourceServer -InputFile $primaryfileName -QueryTimeout 1000
 
 $text = 
 
@@ -235,7 +237,7 @@ $secondaryfileName = "$ScriptDirectory\$target.sql"
 $secondaryfileName
 $text | Out-File -FilePath $secondaryfileName
 
-Invoke-Sqlcmd -ServerInstance $targetServer -InputFile $secondaryfileName
+Invoke-Sqlcmd -ServerInstance $targetServer -InputFile $secondaryfileName -QueryTimeout 1000
 
 }
 
@@ -249,14 +251,14 @@ $query =
     ,@secondary_database = N'$dbName';
 "
 
-Invoke-Sqlcmd -ServerInstance $sourceServer -Query $query
+Invoke-Sqlcmd -ServerInstance $sourceServer -Query $query -QueryTimeout 1000
 
 }
 
 function RunBackupJob{
 
     param ($SQLServer, $JobName)
-    Start-SQLAgentJob -SQLServer $SQLServer -JobName $JobName
+    Start-SQLAgentJob -SQLServer $SQLServer -JobName $JobName -QueryTimeout 1000
 
 }
 
