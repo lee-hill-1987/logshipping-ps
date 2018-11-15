@@ -16,6 +16,8 @@ function SQL_PerformBackup{
 
         Invoke-Sqlcmd -ServerInstance $instanceName -Query $query -QueryTimeout 1000
     }
+
+function SQL_remove
         
 function SQL_RestoreDatabase{
     param([string] $sourceInstance, [string] $targetInstance, [string] $dbName, [string] $backupFilePath)
@@ -244,17 +246,31 @@ Invoke-Sqlcmd -ServerInstance $targetServer -InputFile $secondaryfileName -Query
 
 }
 
-function SQL_DisableLogShippingPrimary{
-param($sourceServer, $targetServer, $dbName)
-$query = 
-"
-    EXEC master.dbo.sp_delete_log_shipping_primary_secondary  
-    @primary_database = N'$dbName'  
-    ,@secondary_server = N'$targetServer'  
-    ,@secondary_database = N'$dbName';
-"
+function SQL_DisableLogShippingPrimary {
+    param($targetServer, $dbName)
+    $query = 
+    "
+       exec master.sys.sp_delete_log_shipping_primary_database
+        @database = '"+$dbName+"'-- sysname
+       ,@ignoreremotemonitor = 0 -- bit
 
-Invoke-Sqlcmd -ServerInstance $sourceServer -Query $query -QueryTimeout 1000
+    "
+
+    Invoke-Sqlcmd -ServerInstance $targetServer -Query $query -QueryTimeout 1000
+
+}
+
+function SQL_DisableLogShippingSecondary {
+    param($targetServer, $dbName)
+    $query = 
+    "
+       exec master.sys.sp_delete_log_shipping_secondary_database
+        @database = '"+$dbName+"'-- sysname
+       ,@ignoreremotemonitor = 0 -- bit
+
+    "
+
+    Invoke-Sqlcmd -ServerInstance $targetServer -Query $query -QueryTimeout 1000
 
 }
 

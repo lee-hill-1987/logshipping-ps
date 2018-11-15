@@ -12,7 +12,6 @@ catch {
 #endregion
 
 # region include functions file
-#try {
 
     if($instanceName)
     {
@@ -77,14 +76,7 @@ catch {
 
     Start-Sleep -Seconds 3
 
-    SQL_DisableLogShippingPrimary -sourceServer $fullSourceInstanceName -targetServer $fullDestinationInstanceName -dbName $dbName
+    SQL_DisableLogShippingPrimary -targetServer $fullSourceInstanceName -dbName $dbName
 
-#}
-#catch {
-#    foreach($error in $errors)
-#    {
-#         Write-Host $error.Exception
-#         Write-Host $error.Exception.StackTrace
-#    }
-#}
+    SQL_DisableLogShippingSecondary -targetServer $fullDestinationInstanceName -dbName $dbName
 
