@@ -30,13 +30,9 @@ function SQL_RestoreDatabase{
 
     $datafile = $datafiles.name
     $logfile = $logfiles.name
-
-    $query = "EXEC master.dbo.xp_create_subdir 'F:\Data\"+$dbName+"'; EXEC master.dbo.xp_create_subdir 'F:\Log\"+$dbName+"'"
-    
-    Invoke-Sqlcmd -ServerInstance $targetInstance -Query $query
     
 
-    $query = "restore database $dbName from disk = '\\"+$targetInstance+"\backup\"+$dbName+".bak' with norecovery, move '"+$datafile+"' TO 'F:\Data\"+$dbName+"\"+$dbName+".mdf',  move '"+$logfile+"' TO 'F:\Log\"+$dbName+"\"+$dbName+"_log.ldf' , replace"
+    $query = "restore database $dbName from disk = '\\"+$targetInstance+"\backup\"+$dbName+".bak' with norecovery, move '"+$datafile+"' TO 'F:\Data\"+$dbName+".mdf',  move '"+$logfile+"' TO 'F:\Log\"+$dbName+"_log.ldf' , replace"
     
     $targetInstance
     $query
