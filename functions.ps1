@@ -20,18 +20,21 @@ function SQL_PerformBackup{
 function SQL_RestoreDatabase{
     param([string] $sourceInstance, [string] $targetInstance, [string] $dbName, [string] $backupFilePath)
 
-    $datafiles = Invoke-Sqlcmd -ServerInstance $sourceInstance -Database $dbName -QueryTimeout 1000 -Query “select name, physical_name from master.sys.master_files where name like '%$dbName%' and type = 0”
-    $logfiles = Invoke-Sqlcmd -ServerInstance $sourceInstance -Database $dbName -QueryTimeout 1000 -Query “select name, physical_name from master.sys.master_files where name like '%$dbName%' and type = 1”
+    $datafiles = Invoke-Sqlcmd -ServerInstance $sourceInstance -Database $dbName -Query “select mf.name from master.sys.master_files mf inner join sys.databases db  on db.database_id = mf.database_id where db.name like '%$dbName%' and type = 0”
+    $logfiles = Invoke-Sqlcmd -ServerInstance $sourceInstance -Database $dbName -Query “select mf.name from master.sys.master_files mf inner join sys.databases db  on db.database_id = mf.database_id where db.name like '%$dbName%' and type = 1”
 
     $datafiles
+    $logfiles
 
     $datafile = $datafiles.name
     $logfile = $logfiles.name
 
-    $datafilepath = "F:\Data\$datafile.mdf"
-    $logfilepath = "F:\Logs\$logfile.ldf"
+    $query = "EXEC master.dbo.xp_create_subdir 'F:\Data\"+$dbName+"'; EXEC master.dbo.xp_create_subdir 'F:\Log\"+$dbName+"'"
+    
+    Invoke-Sqlcmd -ServerInstance $targetInstance -Query $query
+    
 
-    $query = "restore database $dbName from disk = '\\$targetInstance\backup\$dbName.bak' with norecovery, move '$datafile' TO '$datafilepath',  move '$logfile' TO '$logfilepath' , replace"
+    $query = "restore database $dbName from disk = '\\"+$targetInstance+"\backup\"+$dbName+".bak' with norecovery, move '"+$datafile+"' TO 'F:\Data\"+$dbName+"\"+$dbName+".mdf',  move '"+$logfile+"' TO 'F:\Log\"+$dbName+"\"+$dbName+"_log.ldf' , replace"
     
     $targetInstance
     $query

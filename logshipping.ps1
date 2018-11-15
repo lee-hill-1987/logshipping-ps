@@ -4,7 +4,9 @@ $csv = Import-Csv $csvfile
 
 $ScriptDirectory = Split-Path -Path $MyInvocation.MyCommand.Definition -Parent
 $asyncscript = $("$ScriptDirectory\AsyncProcess.ps1")
-#$asyncscript = $("$psscriptroot\AsyncProcess.ps1")
+$outputfile = $("$ScriptDirectory\output.txt")
+
+"start" | Out-File $outputfile
 
 $asyncscript
 
@@ -14,20 +16,30 @@ if( -not $Credentials)
 }
 
 $csv
-$asyncscript
 
 foreach($line in $csv)
 {
-    Write-host ""
-    Write-host "Starting Processing on "$line.SourceServer"."$line.DatabaseName
+    
+    "Starting Processing on "+$line.SourceServer+"."+$line.DatabaseName | Out-File -Append $outputfile
     
     Start-Job -FilePath $asyncscript -ArgumentList $Credentials, $line.SourceServer,$line.DestinationServer, $line.InstanceName, $line.DestInstanceName, $line.DatabaseName, $ScriptDirectory
 }
 
-Start-Sleep -Seconds 45
+#Start-Sleep -Seconds 45
 
 $asyncscript
 
-Get-Job | % { Receive-Job $_.Id}
+
+while(Get-Job -State Running)
+{
+    Start-Sleep -Seconds 3
+    Get-Job -State Running | % { 
+
+    $outputfile = $("$ScriptDirectory\"+$_.Id+"-output.txt")
+
+    Receive-Job $_.Id | Out-File -Append $outputfile }
+}
+
+
 
 
