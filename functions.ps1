@@ -29,7 +29,20 @@ function SQL_RestoreDatabase{
     $logfile = $logfiles.name
     
 
-    $query = "restore database $dbName from disk = '\\"+$targetInstance+"\backup\"+$dbName+".bak' with norecovery, move '"+$datafile+"' TO 'F:\Data\"+$dbName+".mdf',  move '"+$logfile+"' TO 'F:\Log\"+$dbName+"_log.ldf' , replace"
+    $query = "
+    
+    exec sys.sp_configure @configname = 'show advanced options', @configvalue = 1;
+        reconfigure;
+        exec sp_configure @configname = 'xp_cmdshell', @configvalue = 1;
+        reconfigure;
+    
+        restore database $dbName from disk = '\\"+$targetInstance+"\backup\"+$dbName+".bak' with norecovery, move '"+$datafile+"' TO 'F:\Data\"+$dbName+".mdf',  move '"+$logfile+"' TO 'F:\Log\"+$dbName+"_log.ldf' , replace;
+    
+        if @@error = 0 
+        begin
+            exec master.dbo.xp_cmdshell 'del \\"+$targetInstance+"\backup\"+$dbName+".bak'
+        end;
+    "
     
     $query
 
@@ -42,6 +55,102 @@ function SQL_RestoreWithRecovery{
      [string](get-date) + ": setting recovery on $targetInstance.$dbName"    
         Invoke-Sqlcmd -Query "restore database $dbName with RECOVERY;" -ServerInstance $targetInstance -QueryTimeout 1000
 }
+
+
+
+function SQL_DisableLogShipping {
+    param($sourceServer, $targetServer, $dbName)
+
+    [string](get-date) + ": removing log shipping config"
+
+    $query = 
+    "
+         EXEC master.dbo.sp_delete_log_shipping_primary_secondary @primary_database = '"+$dbName+"', @secondary_server = '"+$targetServer+"', @secondary_database = '"+$dbName+"'
+    "
+
+    Invoke-Sqlcmd -ServerInstance $sourceServer -Query $query -QueryTimeout 1000
+
+    $query = 
+    "   
+        exec master.sys.sp_delete_log_shipping_secondary_database
+            @secondary_database = '"+$dbName+"'  -- sysname
+           ,@ignoreremotemonitor = 1
+    "
+    Invoke-Sqlcmd -ServerInstance $targetServer -Query $query -QueryTimeout 1000
+
+    $query = 
+    "  
+        EXEC master.dbo.sp_delete_log_shipping_primary_database @database = '"+$dbName+"'
+     "
+    Invoke-Sqlcmd -ServerInstance $sourceServer -Query $query -QueryTimeout 1000
+
+     $query = 
+    " 
+        exec master.dbo.sp_delete_log_shipping_secondary_primary
+           @primary_server = '"+$sourceServer+"'
+          ,@primary_database = '"+$dbName+"'
+    "
+    Invoke-Sqlcmd -ServerInstance $sourceServer -Query $query -QueryTimeout 1000
+
+}
+
+function SQL_DisableLogShippingSecondary {
+    param($sourceServer, $targetServer, $dbName)
+
+    [string](get-date) + ": removing log shipping Secondary config"
+
+    $query = 
+    "    
+       exec master.dbo.sp_delete_log_shipping_secondary_primary
+           @primary_server = '"+$sourceServer+"'
+          ,@primary_database = '"+$dbName+"';
+   
+    "
+
+    Invoke-Sqlcmd -ServerInstance $targetServer -Query $query -QueryTimeout 1000
+
+}
+
+function Start_SQLAgentJob
+{
+
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory=$true)][string]$SQLServer ,
+        [Parameter(Mandatory=$true)][string]$JobName
+    )
+
+    [string](get-date) + ": running Job: "+ $JobName
+    
+    # Load the SQLPS module
+    Push-Location; Import-Module SQLPS -DisableNameChecking; Pop-Location
+
+    $ServerObj = New-Object Microsoft.SqlServer.Management.Smo.Server($SQLServer)
+    $ServerObj.ConnectionContext.Connect()
+    $JobObj = $ServerObj.JobServer.Jobs | Where-Object {$_.Name -eq $JobName}
+    $JobObj.Refresh()
+
+    # If the job is and enabled and not currently executing start it
+    if ($JobObj.CurrentRunStatus -ne "Executing") {
+        $JobObj.Start()
+    }
+
+    # Wait until the job completes. Check every second.
+    do {
+        Start-Sleep -Seconds 1
+        # You have to run the refresh method to reread the status
+        $JobObj.Refresh()
+    } While ($JobObj.CurrentRunStatus -eq "Executing")
+
+    # Get the run duration by adding all of the step durations
+    $RunDuration = 0
+    foreach($JobStep in $JobObj.JobSteps)     {
+        $RunDuration += $JobStep.LastRunDuration
+    }
+
+    $JobObj | select Name,CurrentRunStatus,LastRunOutcome,LastRunDate,@{Name="LastRunDurationSeconds";Expression={$RunDuration}}
+}
+
 
 function SQL_WriteOutSQLFiles{
 param ([string] $sourceServer,  [string] $targetServer, [string] $dbName, $BackupJobName, $CopyJobName, $RestoreJobName, $ScriptDirectory)
@@ -239,75 +348,4 @@ $text | Out-File -FilePath $secondaryfileName
 
 Invoke-Sqlcmd -ServerInstance $targetServer -InputFile $secondaryfileName -QueryTimeout 1000
 
-}
-
-function SQL_DisableLogShippingPrimary {
-    param($sourceServer, $targetServer, $dbName)
-
-    [string](get-date) + ": removing log shipping Primary config"
-
-    $query = 
-    "
-         EXEC master.dbo.sp_delete_log_shipping_primary_secondary @primary_database = '"+$dbName+"', @secondary_server = '"+$targetServer+"', @secondary_database = '"+$dbName+"'
-    "
-
-    Invoke-Sqlcmd -ServerInstance $sourceServer -Query $query -QueryTimeout 1000
-
-}
-
-function SQL_DisableLogShippingSecondary {
-    param($sourceServer, $targetServer, $dbName)
-
-    [string](get-date) + ": removing log shipping Secondary config"
-
-    $query = 
-    "    
-       exec master.dbo.sp_delete_log_shipping_secondary_primary
-           @primary_server = '"+$sourceServer+"'
-          ,@primary_database = '"+$dbName+"';
-   
-    "
-
-    Invoke-Sqlcmd -ServerInstance $targetServer -Query $query -QueryTimeout 1000
-
-}
-
-function Start_SQLAgentJob
-{
-
-    [CmdletBinding()]
-    param (
-        [Parameter(Mandatory=$true)][string]$SQLServer ,
-        [Parameter(Mandatory=$true)][string]$JobName
-    )
-
-    [string](get-date) + ": running Job: "+ $JobName
-    
-    # Load the SQLPS module
-    Push-Location; Import-Module SQLPS -DisableNameChecking; Pop-Location
-
-    $ServerObj = New-Object Microsoft.SqlServer.Management.Smo.Server($SQLServer)
-    $ServerObj.ConnectionContext.Connect()
-    $JobObj = $ServerObj.JobServer.Jobs | Where-Object {$_.Name -eq $JobName}
-    $JobObj.Refresh()
-
-    # If the job is and enabled and not currently executing start it
-    if ($JobObj.CurrentRunStatus -ne "Executing") {
-        $JobObj.Start()
-    }
-
-    # Wait until the job completes. Check every second.
-    do {
-        Start-Sleep -Seconds 1
-        # You have to run the refresh method to reread the status
-        $JobObj.Refresh()
-    } While ($JobObj.CurrentRunStatus -eq "Executing")
-
-    # Get the run duration by adding all of the step durations
-    $RunDuration = 0
-    foreach($JobStep in $JobObj.JobSteps)     {
-        $RunDuration += $JobStep.LastRunDuration
-    }
-
-    $JobObj | select Name,CurrentRunStatus,LastRunOutcome,LastRunDate,@{Name="LastRunDurationSeconds";Expression={$RunDuration}}
 }
