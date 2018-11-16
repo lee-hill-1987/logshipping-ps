@@ -4,9 +4,6 @@ $csv = Import-Csv $csvfile
 
 $ScriptDirectory = Split-Path -Path $MyInvocation.MyCommand.Definition -Parent
 $asyncscript = $("$ScriptDirectory\AsyncProcess.ps1")
-$outputfile = $("$ScriptDirectory\output.txt")
-
-"start" | Out-File $outputfile
 
 $asyncscript
 
@@ -19,15 +16,13 @@ $csv
 
 foreach($line in $csv)
 {
-    
-    "Starting Processing on "+$line.SourceServer+"."+$line.DatabaseName | Out-File -Append $outputfile
-    
-    Start-Job -FilePath $asyncscript -ArgumentList $Credentials, $line.SourceServer,$line.DestinationServer, $line.InstanceName, $line.DestInstanceName, $line.DatabaseName, $ScriptDirectory
+   
+    $job = Start-Job -FilePath $asyncscript -ArgumentList $Credentials, $line.SourceServer,$line.DestinationServer, $line.InstanceName, $line.DestInstanceName, $line.DatabaseName, $ScriptDirectory
+
+    $outputfile = $("$ScriptDirectory\"+$job.Id+"-output.txt")
+
+    [string](get-date) + ": Starting Processing on "+$line.SourceServer+"."+$line.DatabaseName | Out-File -Append $outputfile
 }
-
-#Start-Sleep -Seconds 45
-
-$asyncscript
 
 
 while(Get-Job -State Running)

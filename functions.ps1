@@ -1,14 +1,14 @@
 ﻿function SQL_SetRecoveryModel{
     param([string] $fullSourceInstanceName, [string] $dbName )
 
-        Write-host "setting recovery on $fullSourceInstanceName.$dbName"    
+        [string](get-date) + ": setting recovery on $fullSourceInstanceName.$dbName"    
         Invoke-Sqlcmd -Query "ALTER database $dbName SET RECOVERY FULL;" -ServerInstance $fullSourceInstanceName -QueryTimeout 1000
     }
 
 function SQL_PerformBackup{
     param([string] $serverName, [string] $instanceName, [string] $dbName )
             
-        Write-host "Performing Full Backup on $instanceName.$dbName"
+        [string](get-date) + ": Performing Full Backup on $instanceName.$dbName"
         
         $backupFilePath = "\\$serverName\backup\$dbName.bak"
 
@@ -20,11 +20,10 @@ function SQL_PerformBackup{
 function SQL_RestoreDatabase{
     param([string] $sourceInstance, [string] $targetInstance, [string] $dbName, [string] $backupFilePath)
 
+    [string](get-date) + ": restoring Backup on $targetInstance.$dbName"
+
     $datafiles = Invoke-Sqlcmd -ServerInstance $sourceInstance -Database $dbName -Query “select mf.name from master.sys.master_files mf inner join sys.databases db  on db.database_id = mf.database_id where db.name like '%$dbName%' and type = 0”
     $logfiles = Invoke-Sqlcmd -ServerInstance $sourceInstance -Database $dbName -Query “select mf.name from master.sys.master_files mf inner join sys.databases db  on db.database_id = mf.database_id where db.name like '%$dbName%' and type = 1”
-
-    $datafiles
-    $logfiles
 
     $datafile = $datafiles.name
     $logfile = $logfiles.name
@@ -32,7 +31,6 @@ function SQL_RestoreDatabase{
 
     $query = "restore database $dbName from disk = '\\"+$targetInstance+"\backup\"+$dbName+".bak' with norecovery, move '"+$datafile+"' TO 'F:\Data\"+$dbName+".mdf',  move '"+$logfile+"' TO 'F:\Log\"+$dbName+"_log.ldf' , replace"
     
-    $targetInstance
     $query
 
     Invoke-Sqlcmd -ServerInstance $targetInstance -Query $query -QueryTimeout 1000
@@ -41,12 +39,15 @@ function SQL_RestoreDatabase{
 function SQL_RestoreWithRecovery{
     param($targetInstance, [string] $dbName)
 
-     Write-host "setting recovery on $targetInstance.$dbName"    
+     [string](get-date) + ": setting recovery on $targetInstance.$dbName"    
         Invoke-Sqlcmd -Query "restore database $dbName with RECOVERY;" -ServerInstance $targetInstance -QueryTimeout 1000
 }
 
 function SQL_WriteOutSQLFiles{
 param ([string] $sourceServer,  [string] $targetServer, [string] $dbName, $BackupJobName, $CopyJobName, $RestoreJobName, $ScriptDirectory)
+
+[string](get-date) + ": writing out SQL logshipping config files"
+
 $source = "$($sourceServer.Replace("\","-"))_$($dbName)"
 $target = "$($targetServer.Replace("\","-"))_$($dbName)"
 
@@ -241,40 +242,35 @@ Invoke-Sqlcmd -ServerInstance $targetServer -InputFile $secondaryfileName -Query
 }
 
 function SQL_DisableLogShippingPrimary {
-    param($targetServer, $dbName)
+    param($sourceServer, $targetServer, $dbName)
+
+    [string](get-date) + ": removing log shipping Primary config"
+
     $query = 
     "
-       exec master.sys.sp_delete_log_shipping_primary_database
-        @database = '"+$dbName+"'-- sysname
-       ,@ignoreremotemonitor = 0 -- bit
-
+         EXEC master.dbo.sp_delete_log_shipping_primary_secondary @primary_database = '"+$dbName+"', @secondary_server = '"+$targetServer+"', @secondary_database = '"+$dbName+"'
     "
 
-    Invoke-Sqlcmd -ServerInstance $targetServer -Query $query -QueryTimeout 1000
+    Invoke-Sqlcmd -ServerInstance $sourceServer -Query $query -QueryTimeout 1000
 
 }
 
 function SQL_DisableLogShippingSecondary {
-    param($targetServer, $dbName)
-    $query = 
-    "
-       exec master.sys.sp_delete_log_shipping_secondary_database
-        @database = '"+$dbName+"'-- sysname
-       ,@ignoreremotemonitor = 0 -- bit
+    param($sourceServer, $targetServer, $dbName)
 
+    [string](get-date) + ": removing log shipping Secondary config"
+
+    $query = 
+    "    
+       exec master.dbo.sp_delete_log_shipping_secondary_primary
+           @primary_server = '"+$sourceServer+"'
+          ,@primary_database = '"+$dbName+"';
+   
     "
 
     Invoke-Sqlcmd -ServerInstance $targetServer -Query $query -QueryTimeout 1000
 
 }
-
-function RunBackupJob{
-
-    param ($SQLServer, $JobName)
-    Start-SQLAgentJob -SQLServer $SQLServer -JobName $JobName -QueryTimeout 1000
-
-}
-
 
 function Start_SQLAgentJob
 {
@@ -284,6 +280,8 @@ function Start_SQLAgentJob
         [Parameter(Mandatory=$true)][string]$SQLServer ,
         [Parameter(Mandatory=$true)][string]$JobName
     )
+
+    [string](get-date) + ": running Job: "+ $JobName
     
     # Load the SQLPS module
     Push-Location; Import-Module SQLPS -DisableNameChecking; Pop-Location

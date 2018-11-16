@@ -76,7 +76,12 @@ catch {
 
     Start-Sleep -Seconds 3
 
-    SQL_DisableLogShippingPrimary -targetServer $fullSourceInstanceName -dbName $dbName
+    SQL_DisableLogShippingPrimary -sourceServer $fullSourceInstanceName -targetServer $fullDestinationInstanceName -dbName $dbName
 
-    SQL_DisableLogShippingSecondary -targetServer $fullDestinationInstanceName -dbName $dbName
+    Start-Sleep -Seconds 3
+
+    SQL_DisableLogShippingSecondary -sourceServer $fullSourceInstanceName -targetServer $fullDestinationInstanceName -dbName $dbName
+
+    
+    
 
